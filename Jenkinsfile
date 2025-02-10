@@ -27,7 +27,7 @@ pipeline {
                     Write-Output \$count
                     """).trim()
 
-                    writeFile file: OUTPUT_FILE, text: "<html><body><h1>Output</h1><p>letter ${charParam} found ${output} times </p></body></html>"
+                    writeFile file: OUTPUT_FILE, text: "<html><body><h1>Output</h1><p>letter <p style={{color:red}}>${charParam}</p> found ${output} times </p></body></html>"
                 }
             }
         }
