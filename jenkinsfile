@@ -4,6 +4,10 @@ pipeline {
     parameters {
         string(name: 'CHAR', defaultValue: 'a', description: 'האות לבדיקה')
     }
+
+    environment {
+        OUTPUT_FILE = 'output.html'
+    }
     
     stages {
         stage('Clone Repository') {
@@ -12,30 +16,26 @@ pipeline {
             }
         }
         
-        stage('Install Node.js') {
+        stage('Run PowerShell Script') {
             steps {
                 script {
-                    // התקנת Node.js אם הוא לא מותקן
-                    def nodeExists = bat(script: 'node --version', returnStatus: true) == 0
-                    if (!nodeExists) {
-                        bat 'choco install nodejs'
-                    }
+                    def charParam = params.CHAR
+                    def output = powershell(returnStdout: true, script: """
+                    \$char = '${charParam}'
+                    \$str = "hello this is a checking function, here we check how many letters are found like a parameter"
+                    \$count = (\$str -split '').Where({\$_ -eq \$char}).Count
+                    Write-Output \$count
+                    """).trim()
+
+                    writeFile file: OUTPUT_FILE, text: "<html><body><h1>Output</h1><p>${output}</p></body></html>"
                 }
             }
         }
         
-        stage('Run Script') {
+        stage('Display Parameter') {
             steps {
                 script {
-                    // יצירת קובץ להרצת הבדיקה
-                    bat '''
-                    echo const countCharacterOccurrences = require('./countCharacterOccurrences'); > checkOccurrence.js
-                    echo const char = process.argv[2]; >> checkOccurrence.js
-                    echo console.log(`האות "${char}" מופיעה ${countCharacterOccurrences(char)} פעמים במחרוזת.`); >> checkOccurrence.js
-                    '''
-
-                    // הרצת הסקריפט עם הפרמטר
-                    bat 'node checkOccurrence.js ${params.CHAR} > result.txt'
+                    currentBuild.description = "Character parameter is ${params.CHAR}"
                 }
             }
         }
@@ -43,16 +43,12 @@ pipeline {
         stage('Generate HTML Report') {
             steps {
                 script {
-                    // יצירת קובץ HTML מהתוצאה
-                    bat '''
-                    echo ^<html^> > report.html
-                    echo ^<head^>^<title^>Character Count Report^</title^>^</head^> >> report.html
-                    echo ^<body^> >> report.html
-                    echo ^<h1^>Character Count Report^</h1^> >> report.html
-                    echo ^<p^>Character: ${params.CHAR}^</p^> >> report.html
-                    type result.txt >> report.html
-                    echo ^</body^>^</html^> >> report.html
-                    '''
+                    def description = currentBuild.description
+                    if (description.contains(params.CHAR)) {
+                        echo "Parameter ${params.CHAR} exists on the web page."
+                    } else {
+                        error "Parameter ${params.CHAR} does not exist on the web page."
+                    }
                 }
             }
         }
@@ -60,14 +56,14 @@ pipeline {
     
     post {
         always {
-            // פרסום הדוח
+            archiveArtifacts artifacts: OUTPUT_FILE, fingerprint: true
             publishHTML(target: [
                 allowMissing: false,
                 alwaysLinkToLastBuild: true,
                 keepAll: true,
                 reportDir: '.',
-                reportFiles: 'report.html',
-                reportName: 'Character Count Report'
+                reportFiles: OUTPUT_FILE,
+                reportName: 'PowerShell Script Output'
             ])
         }
     }
