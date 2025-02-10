@@ -1,0 +1,74 @@
+pipeline {
+    agent any
+    
+    parameters {
+        string(name: 'CHAR', defaultValue: 'a', description: 'האות לבדיקה')
+    }
+    
+    stages {
+        stage('Clone Repository') {
+            steps {
+                git 'https://github.com/Alex-P-87/year3_semester1.git'
+            }
+        }
+        
+        stage('Install Node.js') {
+            steps {
+                script {
+                    // התקנת Node.js אם הוא לא מותקן
+                    def nodeExists = bat(script: 'node --version', returnStatus: true) == 0
+                    if (!nodeExists) {
+                        bat 'choco install nodejs'
+                    }
+                }
+            }
+        }
+        
+        stage('Run Script') {
+            steps {
+                script {
+                    // יצירת קובץ להרצת הבדיקה
+                    bat '''
+                    echo const countCharacterOccurrences = require('./countCharacterOccurrences'); > checkOccurrence.js
+                    echo const char = process.argv[2]; >> checkOccurrence.js
+                    echo console.log(`האות "${char}" מופיעה ${countCharacterOccurrences(char)} פעמים במחרוזת.`); >> checkOccurrence.js
+                    '''
+
+                    // הרצת הסקריפט עם הפרמטר
+                    bat 'node checkOccurrence.js ${params.CHAR} > result.txt'
+                }
+            }
+        }
+        
+        stage('Generate HTML Report') {
+            steps {
+                script {
+                    // יצירת קובץ HTML מהתוצאה
+                    bat '''
+                    echo ^<html^> > report.html
+                    echo ^<head^>^<title^>Character Count Report^</title^>^</head^> >> report.html
+                    echo ^<body^> >> report.html
+                    echo ^<h1^>Character Count Report^</h1^> >> report.html
+                    echo ^<p^>Character: ${params.CHAR}^</p^> >> report.html
+                    type result.txt >> report.html
+                    echo ^</body^>^</html^> >> report.html
+                    '''
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            // פרסום הדוח
+            publishHTML(target: [
+                allowMissing: false,
+                alwaysLinkToLastBuild: true,
+                keepAll: true,
+                reportDir: '.',
+                reportFiles: 'report.html',
+                reportName: 'Character Count Report'
+            ])
+        }
+    }
+}
