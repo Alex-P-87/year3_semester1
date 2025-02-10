@@ -12,5 +12,5 @@ function countCharacterOccurrences() {
         fi
     done
 
-    echo $count
+    echo "letter $char: cuount $count times"
 }
